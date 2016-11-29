@@ -1,22 +1,20 @@
-'''
-Computes possible anagrams using a loaded list of words
-'''
-
 from collections import Counter
 
-anag_base = 'poultry outwits ants'
-wordfile = 'wordlist'
 
 def read_words(fname):
-    f = open(fname,'r')
-    print('File loaded')
+    print('Loading file... ', end='')
+    f = open(fname, 'r')
+    print('done')
     return f.readlines()
 
 
 def trim(x):
     return "".join(x.split())
 
+
 def remove_impossible_words(words, anag_c):
+    print('Removing impossible words from list... ', end='')
+    """ Removes words which include letters not in the anagram base """
     i = 0
     while i < len(words):
         words[i] = trim(words[i])
@@ -25,90 +23,72 @@ def remove_impossible_words(words, anag_c):
             words.pop(i)
         else:
             i += 1
-    print('Impossible words removed')
+    words = sorted(list(set(words)))
+    print('done')
+    return words
 
 
-def anagram_generator(words, anag_c, root_check=False):
-    l_words = words[:]  # local copy
-    i = 0
-    while i < len(l_words):
-        word = l_words[i]
-        if root_check:
-            print('Checking descendants of ' + word)
-        word_c = Counter(word)
-        if all(letter in anag_c for letter in word_c):  # Found a matching word
-            if anag_c == word_c:
-                yield [word]
-            elif anag_c - word_c:
-                for res in anagram_generator(l_words, anag_c-word_c):
-                    # if res is True:  # end of recursion reached (no more letters in anagram)
-                    #     yield [word]
-                    # if res:  # sequence found
-                    yield [word] + res
-
-        l_words.pop(0)
-        if root_check:
-            print('Words left: ' + str(len(l_words)))
-        else:
-            i += 1
+class Node:
+    def __init__(self):
+        self.children = {}
+        self.words = []
 
 
-def is_anag(s1, s2):
-    return Counter(s1) == Counter(''.join(s2))
+class Trie:
+    def __init__(self):
+        self.root = Node()
+
+    def add_word(self, word):
+        node = self.root
+        letters = sorted(trim(word))
+        for l in letters:
+            if l not in node.children:
+                node.children[l] = Node()
+            node = node.children[l]
+        node.words.append(word)
+
+    def anagrams(self, anag_c, maxwords=3, n_words=0, rootcheck=False):
+        critical_letter = sorted(anag_c)[0]
+        if critical_letter in self.root.children and n_words < maxwords:
+            for words in self.possible_words(anag_c - Counter(critical_letter),
+                                            self.root.children[critical_letter]):
+                if rootcheck:
+                    print('Checking descendants of word ' + str(words))
+                if anag_c == Counter(words[0]):
+                    for word in words:
+                        yield (word,)
+                else:
+                    for wordlist in self.anagrams(anag_c - Counter(words[0]), n_words=n_words + 1):
+                        for word in words:
+                            yield (word,) + wordlist
 
 
+    def possible_words(self, anag_c, node):
+        ''' Yields all possible words in the trie structure under node given anag_c constrains '''
+        # for word in node.words:
+        #     yield word
+        if len(node.words) > 0:
+            yield tuple(node.words)
+        for letter in anag_c:
+            if letter in node.children:
+                for words in self.possible_words(anag_c - Counter(letter), node.children[letter]):
+                    yield tuple(words)
 
-words = read_words(wordfile)
-# words[0] = 'poultryoutwits'
-# words[1] = 'ants'
-anag_c = Counter(trim(anag_base))
+print(__name__)
+if __name__ == '__main__':
+    anag_base = 'poultry outwits ants'
+    wordfile = 'wordlist'
 
-remove_impossible_words(words, anag_base)  # words is a list (mutable type)
-words = list(set(words))
-print(len(words))
-words.sort()
-print(words)
+    words = read_words(wordfile)
+    anagram_counter = Counter(trim(anag_base))
+    words = remove_impossible_words(words, anagram_counter)
+    trie = Trie()
 
-for a in anagram_generator(words, anag_c, True):
-    print(is_anag(trim(anag_base), a))
-    print(a)
-#
-# print('done')
+    print('Adding words to trie... ', end='')
+    for word in words:
+        trie.add_word(word)
+    print('done')
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    for anagram in trie.anagrams(anagram_counter, rootcheck=False, maxwords=4):
+        print(anagram)
 
