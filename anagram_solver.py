@@ -1,19 +1,29 @@
+from hashlib import md5
 from collections import Counter
+from itertools import permutations
 
 
 def read_words(fname):
-    print('Loading file... ', end='')
+    print('Loading file... ')
     f = open(fname, 'r')
-    print('done')
-    return f.readlines()
+    lines = f.readlines()
+    f.close()
+    return lines
 
 
 def trim(x):
     return "".join(x.split())
 
 
+def save_to_file(fname, anagram_list):
+    f = open(fname, 'w')
+    for anagram in anagram_list:
+        f.write(' '.join(anagram) + '\n')
+    f.close()
+
+
 def remove_impossible_words(words, anag_c):
-    print('Removing impossible words from list... ', end='')
+    print('Removing impossible words from list... ')
     """ Removes words which include letters not in the anagram base """
     i = 0
     while i < len(words):
@@ -24,7 +34,6 @@ def remove_impossible_words(words, anag_c):
         else:
             i += 1
     words = sorted(list(set(words)))
-    print('done')
     return words
 
 
@@ -58,7 +67,7 @@ class Trie:
                     for word in words:
                         yield (word,)
                 else:
-                    for wordlist in self.anagrams(anag_c - Counter(words[0]), n_words=n_words + 1):
+                    for wordlist in self.anagrams(anag_c - Counter(words[0]), n_words=n_words + 1, maxwords=maxwords):
                         for word in words:
                             yield (word,) + wordlist
 
@@ -78,17 +87,36 @@ print(__name__)
 if __name__ == '__main__':
     anag_base = 'poultry outwits ants'
     wordfile = 'wordlist'
+    maxwords = 4
+    target_hash = '4624d200580677270a54ccff86b9610e'
 
-    words = read_words(wordfile)
-    anagram_counter = Counter(trim(anag_base))
-    words = remove_impossible_words(words, anagram_counter)
-    trie = Trie()
+    anagrams = []
+    try:
+        f = open('anagrams_maxwords' + str(maxwords))
+        for line in f:
+            anagrams.append(tuple(line.strip().split(' ')))
+        print('Found anagrams from file: ' + str(len(anagrams)))
+    except FileNotFoundError:
 
-    print('Adding words to trie... ', end='')
-    for word in words:
-        trie.add_word(word)
-    print('done')
+        words = read_words(wordfile)
+        anagram_counter = Counter(trim(anag_base))
+        words = remove_impossible_words(words, anagram_counter)
+        trie = Trie()
 
-    for anagram in trie.anagrams(anagram_counter, rootcheck=False, maxwords=4):
-        print(anagram)
+        print('Adding words to trie... ')
+        for word in words:
+            trie.add_word(word)
+        print('Finding anagrams by iteration... ')
+        for anagram in trie.anagrams(anagram_counter, rootcheck=False, maxwords=maxwords):
+            anagrams.append(anagram)
+        print('Number of anagrams found: ' + str(len(anagrams)))
+        print('Saving anagrams to file...')
+        save_to_file('anagrams_maxwords' + str(maxwords), anagrams)
 
+    print('Checking hash of all permutations of anagrams...')
+    for wordtup in anagrams:
+        for anagtup in permutations(wordtup):
+            anagram = ' '.join(anagtup)
+            anagram_hash = md5(anagram.encode()).hexdigest()
+            if anagram_hash == target_hash:
+                print('Target anagram found: ' + anagram)
